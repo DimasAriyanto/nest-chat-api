@@ -1,12 +1,13 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { RefreshTokenRepository } from '../../../infrastructure/repositories/refresh-token.repository';
-import { JwtService } from '../../../infrastructure/auth/jwt.service';
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { RefreshTokenRepository } from '../../../domain/repositories/refresh-token-repository.interface';
+import { TokenService } from '../../../domain/services/token-service.interface';
 
 @Injectable()
 export class RefreshTokenUseCase {
   constructor(
+    @Inject('TokenService') private readonly jwtService: TokenService,
+    @Inject('RefreshTokenRepository')
     private readonly refreshTokenRepo: RefreshTokenRepository,
-    private readonly jwtService: JwtService,
   ) {}
 
   async execute(

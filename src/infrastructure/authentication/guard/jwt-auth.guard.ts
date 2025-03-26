@@ -3,15 +3,14 @@ import {
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
+  Inject,
 } from '@nestjs/common';
-import { JwtService } from '../../infrastructure/auth/jwt.service';
-import { RefreshTokenRepository } from '../../infrastructure/repositories/refresh-token.repository';
+import { TokenService } from '../../../domain/services/token-service.interface';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
-    private readonly jwtService: JwtService,
-    private readonly refreshTokenRepo: RefreshTokenRepository,
+    @Inject('TokenService') private readonly jwtService: TokenService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -23,12 +22,6 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     const token = authHeader.split(' ')[1];
-
-    const storedToken = await this.refreshTokenRepo.getToken(request.user.id);
-
-    if (!storedToken || storedToken !== token) {
-      throw new UnauthorizedException('Refresh token tidak valid.');
-    }
 
     try {
       const decoded = this.jwtService.verifyToken(token);

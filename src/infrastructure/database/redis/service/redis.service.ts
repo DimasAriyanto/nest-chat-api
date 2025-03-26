@@ -30,4 +30,37 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     await this.client.quit();
     console.log('Redis Connection Closed');
   }
+
+  async setHash(key: string, field: string, value: string): Promise<void> {
+    await this.client.hset(key, field, value);
+  }
+
+  async getHash(key: string, field: string): Promise<string | null> {
+    return await this.client.hget(key, field);
+  }
+
+  async getHashAll(key: string): Promise<Record<string, string>> {
+    return await this.client.hgetall(key);
+  }
+
+  async removeHash(key: string, field: string): Promise<void> {
+    await this.client.hdel(key, field);
+  }
+
+  async publish(channel: string, message: string): Promise<void> {
+    await this.client.publish(channel, message);
+  }
+
+  async subscribe(
+    channel: string,
+    callback: (message: string) => void,
+  ): Promise<void> {
+    const subscriber = new Redis({
+      host: process.env.REDIS_HOST || 'localhost',
+      port: Number(process.env.REDIS_PORT) || 6379,
+    });
+
+    subscriber.subscribe(channel);
+    subscriber.on('message', (_, message) => callback(message));
+  }
 }

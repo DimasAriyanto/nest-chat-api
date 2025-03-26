@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService as NestJwtService } from '@nestjs/jwt';
+import { TokenService } from '../../../domain/services/token-service.interface';
 
 @Injectable()
-export class JwtService {
+export class JwtService implements TokenService {
   constructor(private readonly jwtService: NestJwtService) {}
 
   generateAccessToken(payload: Record<string, any>): string {
@@ -14,6 +15,10 @@ export class JwtService {
   }
 
   verifyToken(token: string): Record<string, any> {
-    return this.jwtService.verify(token);
+    try {
+      return this.jwtService.verify(token);
+    } catch (error) {
+      throw error;
+    }
   }
 }

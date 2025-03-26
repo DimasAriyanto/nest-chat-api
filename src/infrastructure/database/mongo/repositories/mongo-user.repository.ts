@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { UserDocument, User } from '../database/schemas/user.schema'; // ✅ Ubah import ke schema
-import { User as DomainUser } from '../../domain/entities/user.entity';
-import { UserRepository } from '../../domain/repositories/user.repository';
+import { UserDocument, User } from '../schemas/user.schema';
+import { User as DomainUser } from '../../../../domain/entities/user.entity';
+import { UserRepository } from '../../../../domain/repositories/user-repository.interface';
 
 @Injectable()
 export class MongoUserRepository implements UserRepository {
   constructor(
-    @InjectModel(User.name) private readonly userModel: Model<UserDocument>, // ✅ Gunakan User dari schema, bukan entitas domain
+    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
   ) {}
 
   private toDomain(user: UserDocument): DomainUser {
@@ -36,5 +36,16 @@ export class MongoUserRepository implements UserRepository {
   async findByUsername(username: string): Promise<DomainUser | null> {
     const user = await this.userModel.findOne({ username }).exec();
     return user ? this.toDomain(user) : null;
+  }
+
+  async findById(userId: string): Promise<User | null> {
+    return this.userModel.findById(userId).exec();
+  }
+
+  async updateUserStatus(userId: string, status: string): Promise<void> {
+    await this.userModel.findByIdAndUpdate(userId, {
+      status,
+      lastSeen: new Date(),
+    });
   }
 }

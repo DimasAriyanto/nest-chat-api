@@ -1,48 +1,32 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { MongooseModule } from '@nestjs/mongoose';
-import { RegisterUseCase } from './application/use-cases/auth/register.use-case';
-import { AuthController } from './interface/controllers/auth.controller';
-import { MongoUserRepository } from './infrastructure/repositories/mongo-user.repository';
-import { LoginUseCase } from './application/use-cases/auth/login.use-case';
-import { JwtService } from './infrastructure/auth/jwt.service';
-import { JwtAuthGuard } from './infrastructure/auth/jwt-auth.guard';
-import { JwtModule } from '@nestjs/jwt';
-import { RedisService } from './infrastructure/database/redis/redis.service';
-import {
-  User,
-  UserSchema,
-} from './infrastructure/database/schemas/user.schema';
-import { RefreshTokenRepository } from './infrastructure/repositories/refresh-token.repository';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { ErrorHandlingFilter } from './shared/middleware/error-handling.filter';
+import { APP_FILTER } from '@nestjs/core';
+import { HttpRateLimitMiddleware } from './shared/middleware/http-rate-limit.middleware';
+import { AuthInterfaceModule } from './interface/modules/auth.module';
+import { RedisModule } from './infrastructure/database/redis/redis.module';
+import { ProfileInterfaceModule } from './interface/modules/profile.module';
+import { ChatInterfaceModule } from './interface/modules/chat.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    MongooseModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        uri: `${configService.get<string>('MONGO_URL')}`,
-      }),
-      inject: [ConfigService],
-    }),
-    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'super-secret-key',
-      signOptions: { expiresIn: '1h' },
-    }),
+    RedisModule,
+    AuthInterfaceModule,
+    ProfileInterfaceModule,
+    ChatInterfaceModule,
   ],
-  controllers: [AuthController],
   providers: [
-    MongoUserRepository,
-    RedisService,
-    JwtService,
-    RefreshTokenRepository,
-    RegisterUseCase,
-    LoginUseCase,
-    JwtAuthGuard,
-    { provide: 'UserRepository', useClass: MongoUserRepository },
+    {
+      provide: APP_FILTER,
+      useClass: ErrorHandlingFilter,
+    },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(HttpRateLimitMiddleware).forRoutes('*');
+  }
+}

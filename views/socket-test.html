@@ -1,0 +1,446 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Dual User Socket.IO Chat Tester</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #f4f4f4;
+      }
+      h1 {
+        text-align: center;
+        color: #333;
+      }
+      .container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        width: 100%;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      .user-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 15px;
+        background-color: #f9f9f9;
+        width: 100%;
+      }
+      .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      .status {
+        font-size: 14px;
+        padding: 5px 10px;
+        border-radius: 4px;
+        margin-left: 10px;
+      }
+      .status.online {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .status.offline {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      .messages {
+        flex: 1;
+        overflow-y: auto;
+        border: 1px solid #ccc;
+        padding: 10px;
+        margin-bottom: 10px;
+        background-color: white;
+        max-width: 100%;
+        word-wrap: break-word;
+        min-height: 200px;
+        max-height: 300px;
+      }
+      .system {
+        color: blue;
+      }
+      .error {
+        color: red;
+      }
+      .sent {
+        color: green;
+        font-weight: bold;
+      }
+      .received {
+        color: purple;
+      }
+      input,
+      button {
+        margin: 5px 0;
+        padding: 8px;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+      }
+      button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      .message-form {
+        display: flex;
+        gap: 10px;
+      }
+      .message-input {
+        flex: 1;
+      }
+      .time {
+        font-size: 12px;
+        color: #666;
+        margin-left: 5px;
+      }
+      .login-form {
+        margin-bottom: 15px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .login-form input {
+        flex: 1;
+      }
+
+      /* Responsive Breakpoints */
+      @media screen and (min-width: 768px) {
+        .container {
+          flex-direction: row;
+        }
+        .user-panel {
+          max-width: calc(50% - 10px);
+        }
+      }
+
+      @media screen and (max-width: 767px) {
+        body {
+          padding: 10px;
+        }
+        .container {
+          flex-direction: column;
+        }
+        .user-panel {
+          width: 100%;
+        }
+        .login-form {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .login-form button {
+          margin-top: 10px;
+        }
+        .message-form {
+          flex-direction: column;
+        }
+        .messages {
+          max-height: 200px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Dual User Socket.IO Chat Tester</h1>
+    <p style="text-align: center">
+      Testing WebSocket chat communication between two simultaneous users
+    </p>
+
+    <div class="container">
+      <!-- User 1 Panel -->
+      <div class="user-panel" id="user1Panel">
+        <div class="panel-header">
+          <h2>User 1</h2>
+          <span class="status offline" id="status1">Disconnected</span>
+        </div>
+
+        <div class="login-form">
+          <input id="token1" placeholder="JWT Token for User 1" />
+          <button id="connect1">Connect</button>
+          <button id="disconnect1" disabled>Disconnect</button>
+        </div>
+
+        <div class="messages" id="messages1"></div>
+
+        <div class="controls">
+          <button id="pingBtn1" disabled>Send Ping</button>
+
+          <div class="message-form">
+            <input
+              id="receiverId1"
+              placeholder="Receiver ID"
+              class="message-input"
+              disabled
+            />
+            <button id="sendBtn1" disabled>Send</button>
+          </div>
+          <input
+            id="messageContent1"
+            placeholder="Message content"
+            style="width: 100%"
+            disabled
+          />
+        </div>
+      </div>
+
+      <!-- User 2 Panel -->
+      <div class="user-panel" id="user2Panel">
+        <div class="panel-header">
+          <h2>User 2</h2>
+          <span class="status offline" id="status2">Disconnected</span>
+        </div>
+
+        <div class="login-form">
+          <input id="token2" placeholder="JWT Token for User 2" />
+          <button id="connect2">Connect</button>
+          <button id="disconnect2" disabled>Disconnect</button>
+        </div>
+
+        <div class="messages" id="messages2"></div>
+
+        <div class="controls">
+          <button id="pingBtn2" disabled>Send Ping</button>
+
+          <div class="message-form">
+            <input
+              id="receiverId2"
+              placeholder="Receiver ID"
+              class="message-input"
+              disabled
+            />
+            <button id="sendBtn2" disabled>Send</button>
+          </div>
+          <input
+            id="messageContent2"
+            placeholder="Message content"
+            style="width: 100%"
+            disabled
+          />
+        </div>
+      </div>
+    </div>
+    <script>
+      // Class to manage socket connections and UI interactions for a user
+      class UserSocketManager {
+        constructor(userIndex) {
+          this.userIndex = userIndex;
+          this.socket = null;
+          this.userId = null;
+          this.serverUrl = 'http://localhost:3000';
+
+          // Get UI elements
+          this.elements = {
+            token: document.getElementById(`token${userIndex}`),
+            connectBtn: document.getElementById(`connect${userIndex}`),
+            disconnectBtn: document.getElementById(`disconnect${userIndex}`),
+            status: document.getElementById(`status${userIndex}`),
+            messages: document.getElementById(`messages${userIndex}`),
+            pingBtn: document.getElementById(`pingBtn${userIndex}`),
+            receiverId: document.getElementById(`receiverId${userIndex}`),
+            messageContent: document.getElementById(
+              `messageContent${userIndex}`,
+            ),
+            sendBtn: document.getElementById(`sendBtn${userIndex}`),
+          };
+
+          // Set up event listeners
+          this.elements.connectBtn.addEventListener('click', () =>
+            this.connect(),
+          );
+          this.elements.disconnectBtn.addEventListener('click', () =>
+            this.disconnect(),
+          );
+          this.elements.pingBtn.addEventListener('click', () =>
+            this.sendPing(),
+          );
+          this.elements.sendBtn.addEventListener('click', () =>
+            this.sendMessage(),
+          );
+        }
+
+        connect() {
+          const token = this.elements.token.value.trim();
+          if (!token) {
+            this.logMessage('Please enter a valid JWT token', 'error');
+            return;
+          }
+
+          // Disconnect existing socket if any
+          if (this.socket) {
+            this.socket.disconnect();
+          }
+
+          // Create new connection
+          this.socket = io(this.serverUrl, {
+            query: { token },
+            path: '/socket.io/',
+          });
+
+          // Set up socket event handlers
+          this.socket.on('connect', () => {
+            console.log(
+              `User ${this.userIndex} connected with socket ID:`,
+              this.socket.id,
+            );
+            this.elements.status.textContent = `Connected: ${this.socket.id}`;
+            this.elements.status.className = 'status online';
+
+            // Enable/disable buttons
+            this.setConnectionState(true);
+          });
+
+          this.socket.on('disconnect', (reason) => {
+            console.log(`User ${this.userIndex} disconnected:`, reason);
+            this.elements.status.textContent = `Disconnected: ${reason}`;
+            this.elements.status.className = 'status offline';
+
+            // Enable/disable buttons
+            this.setConnectionState(false);
+            this.userId = null;
+          });
+
+          this.socket.on('error', (error) => {
+            console.error(`User ${this.userIndex} error:`, error);
+            this.logMessage(`Error: ${JSON.stringify(error)}`, 'error');
+          });
+
+          this.socket.on('connected', (data) => {
+            console.log(`User ${this.userIndex} connected event:`, data);
+            this.userId = data.userId;
+            this.logMessage(
+              `Server confirmed connection: ${JSON.stringify(data)}`,
+              'system',
+            );
+
+            // Set other user's receiverId automatically if the other user is connected
+            const otherUserIndex = this.userIndex === 1 ? 2 : 1;
+            const otherManager = userManagers[otherUserIndex - 1];
+            if (otherManager && otherManager.userId) {
+              otherManager.elements.receiverId.value = this.userId;
+            }
+
+            // Update the status with user ID
+            this.elements.status.textContent = `Connected: ${this.socket.id} (User ID: ${this.userId})`;
+          });
+
+          this.socket.on('receiveDirectMessage', (message) => {
+            console.log(`User ${this.userIndex} received message:`, message);
+            const time = new Date().toLocaleTimeString();
+            this.logMessage(
+              `<b>Received from ${message.senderId}</b>: ${message.content} <span class="time">${time}</span>`,
+              'received',
+            );
+          });
+
+          this.socket.on('messageSent', (data) => {
+            console.log(
+              `User ${this.userIndex} message sent confirmation:`,
+              data,
+            );
+            this.logMessage(
+              `Message sent confirmation: ${JSON.stringify(data)}`,
+              'system',
+            );
+          });
+
+          this.socket.on('pong', (data) => {
+            console.log(`User ${this.userIndex} pong:`, data);
+            this.logMessage(`Pong: ${JSON.stringify(data)}`, 'system');
+          });
+        }
+
+        disconnect() {
+          if (this.socket) {
+            this.socket.disconnect();
+            this.socket = null;
+          }
+        }
+
+        sendPing() {
+          if (this.socket && this.socket.connected) {
+            this.socket.emit('ping', {});
+            this.logMessage('Ping sent', 'system');
+          } else {
+            this.logMessage('Not connected to server', 'error');
+          }
+        }
+
+        sendMessage() {
+          if (!this.socket || !this.socket.connected) {
+            this.logMessage('Not connected to server', 'error');
+            return;
+          }
+
+          const receiverId = this.elements.receiverId.value.trim();
+          const content = this.elements.messageContent.value.trim();
+
+          if (!receiverId) {
+            this.logMessage('Receiver ID is required', 'error');
+            return;
+          }
+
+          if (!content) {
+            this.logMessage('Message content is required', 'error');
+            return;
+          }
+
+          const messageData = {
+            receiverId,
+            content,
+            messageType: 'text',
+          };
+
+          this.socket.emit('sendDirectMessage', messageData);
+          const time = new Date().toLocaleTimeString();
+          this.logMessage(
+            `<b>Sent to ${receiverId}</b>: ${content} <span class="time">${time}</span>`,
+            'sent',
+          );
+
+          // Clear message content field
+          this.elements.messageContent.value = '';
+        }
+
+        logMessage(message, type) {
+          const div = document.createElement('div');
+          div.className = type;
+          div.innerHTML = message;
+          this.elements.messages.appendChild(div);
+          this.elements.messages.scrollTop =
+            this.elements.messages.scrollHeight;
+        }
+
+        setConnectionState(connected) {
+          this.elements.connectBtn.disabled = connected;
+          this.elements.disconnectBtn.disabled = !connected;
+          this.elements.pingBtn.disabled = !connected;
+          this.elements.receiverId.disabled = !connected;
+          this.elements.messageContent.disabled = !connected;
+          this.elements.sendBtn.disabled = !connected;
+
+          if (!connected) {
+            this.elements.receiverId.value = '';
+          }
+        }
+      }
+
+      // Create user managers
+      const userManagers = [new UserSocketManager(1), new UserSocketManager(2)];
+    </script>
+  </body>
+</html>

@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { RedisService } from '../database/redis/redis.service';
+import { RedisService } from '../service/redis.service';
+import { RefreshTokenRepository } from '../../../../domain/repositories/refresh-token-repository.interface';
 
 @Injectable()
-export class RefreshTokenRepository {
+export class RedisRefreshTokenRepository implements RefreshTokenRepository {
   private readonly REFRESH_TOKEN_KEY = 'refresh_token';
 
   constructor(private readonly redisService: RedisService) {}
